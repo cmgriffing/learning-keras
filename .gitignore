@@ -1,0 +1,8 @@
+bin
+tmp
+lib
+include
+*.h5f
+*.mp4
+*.json
+.DS_Store
