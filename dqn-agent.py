@@ -4,6 +4,7 @@ import gym
 import numpy
 from PIL import Image
 
+import keras
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Convolution2D, Permute
 from keras.optimizers import Adam
@@ -44,8 +45,7 @@ parser.add_argument('--weights', type=str, default=None)
 args = parser.parse_args()
 
 
-# env = gym.make(args.env_name)
-env = gym.make('BreakoutDeterministic-v4')
+env = gym.make(args.env_name)
 numpy.random.seed(123)
 env.seed(123)
 
@@ -62,14 +62,14 @@ elif K.image_dim_ordering() == 'th':
 else:
     raise RuntimeError('Unknown image_dim_ordering.')
 model.add(Convolution2D(32, (8, 8), strides=(4, 4)))
-model.add(Activation('relu'))
+# model.add(Activation('relu'))
 model.add(Convolution2D(64, (4, 4), strides=(2, 2)))
-model.add(Activation('relu'))
+# model.add(Activation('relu'))
 model.add(Convolution2D(64, (3, 3), strides=(1, 1)))
-model.add(Activation('relu'))
+# model.add(Activation('relu'))
 model.add(Flatten())
 model.add(Dense(512))
-model.add(Activation('relu'))
+# model.add(Activation('relu'))
 model.add(Dense(nb_actions))
 model.add(Activation('linear'))
 print(model.summary())
@@ -77,21 +77,11 @@ print(model.summary())
 memory = SequentialMemory(limit=1000000, window_length=WINDOW_LENGTH)
 processor = AtariProcessor()
 
-# exploitation based
-policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05, nb_steps=50000)
+# exploitation based?
+# policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0., value_min=-10., value_test=0, nb_steps=50000)
 
-# exploration based
-# policy = BoltzmannQPolicy(tau=1.)
-
-# for i_episode in range(300):
-#     observation = env.reset()
-#     for t in range(5000):
-#         env.render()
-#         action = env.action_space.sample()
-#         observation, reward, done, info = env.step(action)
-
-#         if done:
-#             break
+# random based
+policy = BoltzmannQPolicy(tau=1.)
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory, processor=processor, nb_steps_warmup=10000, gamma=.99, target_model_update=10000, train_interval=4, delta_clip=1.)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
@@ -102,15 +92,15 @@ if args.mode == 'train':
     weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
     checkpoint_weights_filename = 'dqn_' + args.env_name + '_weights_{step}.h5f'
     log_filename = 'dqn_{}_log.json'.format(args.env_name)
-    callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
+    callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=10000)]
     callbacks += [FileLogger(log_filename, interval=100)]
-    dqn.fit(env, callbacks=callbacks, nb_steps=50000, log_interval=10000)
+    dqn.fit(env, callbacks=callbacks, nb_steps=50000, log_interval=10000, visualize=True)
 
     # After training is done, we save the final weights one more time.
     dqn.save_weights(weights_filename, overwrite=True)
 
     # Finally, evaluate our algorithm for 10 episodes.
-    dqn.test(env, nb_episodes=10, visualize=False)
+    dqn.test(env, nb_episodes=10, visualize=True)
 elif args.mode == 'test':
     weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
     if args.weights:
